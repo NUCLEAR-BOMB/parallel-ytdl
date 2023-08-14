@@ -81,18 +81,24 @@ class AuthorTitleFormatter:
         self.extra = ('-o', '%(channel)s{0}%(title)s'.format(self._delim), 
                       '--print', 'after_move:filepath')
 
+    def _format(self, author, title):
+        author = remove_postfix(author, ' - Topic')
+        if title.endswith(author):
+            title = title[:-len(author)].rstrip(' -')
+        elif title.startswith(author):
+            title = title[len(author):].lstrip(' -')
+        
+        return author, title
+
     def __call__(self, path):
         filename, fileext = os.path.splitext(os.path.basename(path))
-        author, title = filename.split(self._delim)
-        if title.endswith(author):
-            striped_title = title[:-len(author)].rstrip(' -')
-        elif title.startswith(author):
-            striped_title = title[len(author):].lstrip(' -')
+        author, title = self._format(*filename.split(self._delim))
         
         try:
-            os.rename(path, '{0} - {1}{2}'.format(author, striped_title, fileext))
+            os.rename(path, '{0} - {1}{2}'.format(author, title, fileext))
         except FileExistsError as err:
             sys.stderr.write("'{}' file exists'\n".format(err.filename2))
+            os.remove(path)
 
 def select_name_formatter(preset):
     if preset == None: return None
