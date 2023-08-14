@@ -88,14 +88,14 @@ class AuthorTitleFormatter:
         elif title.startswith(author):
             title = title[len(author):].lstrip(' -')
         
-        return author, title
+        return '{0} - {1}'.format(author, title)
 
     def __call__(self, path):
         filename, fileext = os.path.splitext(os.path.basename(path))
-        author, title = self._format(*filename.split(self._delim))
+        name = self._format(*filename.split(self._delim))
         
         try:
-            os.rename(path, '{0} - {1}{2}'.format(author, title, fileext))
+            os.rename(path, name + fileext)
         except FileExistsError as err:
             sys.stderr.write("'{}' file exists'\n".format(err.filename2))
             os.remove(path)
