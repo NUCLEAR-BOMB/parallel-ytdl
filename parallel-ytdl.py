@@ -138,8 +138,8 @@ def cache_update(urls_cache, path):
         cache.write(b''.join(urls_cache))
 
 def str_to_bool(string):
-    if string in ['', 'true', '1']: return True
-    elif string in ['false', '0']: return False
+    if string in ['', 'yes' 'true', '1']: return True
+    elif string in ['false', 'no', '0']: return False
     raise argparse.ArgumentTypeError("'{}' cannot be converted to boolean".format(string))
 
 def install_ytdlp():
@@ -185,26 +185,27 @@ def main():
     parser.add_argument('--cache', metavar='PATH', default='download.cache')
     parser.add_argument('--use-cache', type=str_to_bool, nargs='?', const=True, default=True)
     parser.add_argument('--install', choices=('yt-dlp',))
-    parser.add_argument('downloader_args', nargs='*')
 
-    args = parser.parse_args()
+    args, rest = parser.parse_known_args()
+
+    urls = rest[:rest.index('--')] if '--' in rest else rest
+    dl_extra_args = rest[rest.index('--') + 1:] if '--' in rest else []
 
     if args.install == 'yt-dlp':
         install_ytdlp()
         return
 
-    dl_args = args.downloader_args
-    dl_args += apply_download_preset(args.download_preset)
+    dl_preset_args = apply_download_preset(args.download_preset)
 
     dl_exec = find_download_executable(args.exec)
-
-    dl_list = extract_download_list(args.list)
+    
+    dl_list = extract_download_list(args.list) if len(urls) == 0 else urls
+    done_cache = None
     if args.use_cache:
         dl_list, done_cache = cache_diff(dl_list, path=args.cache)
-    else:
-        done_cache = None
+
     name_formatter = select_name_formatter(args.output_preset)
-    invoke_downloaders([dl_exec] + dl_args, dl_list, name_formatter, done_cache)
+    invoke_downloaders([dl_exec] + dl_preset_args + dl_extra_args, dl_list, name_formatter, done_cache)
     if args.use_cache:
         cache_update(done_cache, path=args.cache)
 
