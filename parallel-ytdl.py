@@ -9,7 +9,10 @@ import multiprocessing
 
 def invoke_single_downloader(args, download_queue, lock, name_formatter, done_cache):
     while True:
-        url, cache = download_queue.get()
+        if done_cache != None:
+            url, cache = download_queue.get()
+        else:
+            url = download_queue.get()
         full_command = args + [*(name_formatter.extra if name_formatter else ()), url]
         process = subprocess.Popen(full_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         std_output, std_error = process.communicate()
@@ -24,7 +27,7 @@ def invoke_single_downloader(args, download_queue, lock, name_formatter, done_ca
                     std_error.decode('ascii').rstrip('\n')
                 )
         download_queue.task_done()
-        done_cache.append(cache)
+        if done_cache != None: done_cache.append(cache)
 
 def invoke_downloaders(args, download_list, name_formatter, done_cache):
     max_downloaders = min(len(download_list), multiprocessing.cpu_count())
@@ -37,8 +40,8 @@ def invoke_downloaders(args, download_list, name_formatter, done_cache):
             args, download_queue, lock, name_formatter, done_cache
         ), daemon=True).start()
     
-    for url, cache in download_list:
-        download_queue.put((url, cache))
+    for url_and_cache in download_list:
+        download_queue.put(url_and_cache)
 
     download_queue.join()
 
@@ -116,14 +119,13 @@ def hash_url(url):
 
 CACHE_TRUNCATE = False
 def cache_diff(urls, path):
-    if not os.path.isfile(path): return [(url, hash_url(url)) for url in urls]
-
     old_cache = set()
-    with open(path, 'rb') as cache:
-        while True:
-            tmp = cache.read(URL_HASH_LEN)
-            if len(tmp) < URL_HASH_LEN: break
-            old_cache.add(tmp)
+    if os.path.isfile(path):
+        with open(path, 'rb') as cache:
+            while True:
+                tmp = cache.read(URL_HASH_LEN)
+                if len(tmp) < URL_HASH_LEN: break
+                old_cache.add(tmp)
     url_and_hash, done_cache = [], []
     for url in urls:
         url_hash = hash_url(url)
@@ -137,6 +139,11 @@ def cache_update(urls_cache, path):
     with open(path, 'wb+' if CACHE_TRUNCATE else 'ab') as cache:
         cache.write(b''.join(urls_cache))
 
+def str_to_bool(string):
+    if string in ['', 'true', '1']: return True
+    elif string in ['false', '0']: return False
+    raise argparse.ArgumentTypeError("'{}' cannot be converted to boolean".format(string))
+
 def main():
     parser = argparse.ArgumentParser()
 
@@ -144,19 +151,26 @@ def main():
     parser.add_argument('--exec', metavar='PATH')
     parser.add_argument('--list', type=file_path, metavar='PATH', default='list.txt')
     parser.add_argument('--output-preset', choices=('author-title',))
+    parser.add_argument('--cache', metavar='PATH', default='download.cache')
+    parser.add_argument('--use-cache', type=str_to_bool, nargs='?', const=True, default=True)
     parser.add_argument('downloader_args', nargs='*')
 
     args = parser.parse_args()
+
     dl_args = args.downloader_args
     dl_args += apply_download_preset(args.download_preset)
 
     dl_exec = find_download_executable(args.exec)
 
-    cache_path = 'download.cache'
-    dl_list, done_cache = cache_diff(extract_download_list(args.list), path=cache_path)
+    dl_list = extract_download_list(args.list)
+    if args.use_cache:
+        dl_list, done_cache = cache_diff(dl_list, path=args.cache)
+    else:
+        done_cache = None
     name_formatter = select_name_formatter(args.output_preset)
     invoke_downloaders([dl_exec] + dl_args, dl_list, name_formatter, done_cache)
-    cache_update(done_cache, path=cache_path)
+    if args.use_cache:
+        cache_update(done_cache, path=args.cache)
 
 if __name__ == '__main__':
     main()
