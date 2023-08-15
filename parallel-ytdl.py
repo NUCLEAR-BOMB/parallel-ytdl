@@ -9,7 +9,7 @@ import multiprocessing
 
 def invoke_single_downloader(args, download_queue, lock, name_formatter, done_cache):
     while True:
-        if done_cache != None:
+        if done_cache is not None:
             url, cache = download_queue.get()
         else:
             url = download_queue.get()
@@ -17,7 +17,7 @@ def invoke_single_downloader(args, download_queue, lock, name_formatter, done_ca
         process = subprocess.Popen(full_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         std_output, std_error = process.communicate()
         encoding = sys.getdefaultencoding()
-        if name_formatter != None:
+        if name_formatter is not None:
             name_formatter(std_output.decode(encoding).rstrip())
 
         if len(std_error) != 0:
@@ -27,7 +27,7 @@ def invoke_single_downloader(args, download_queue, lock, name_formatter, done_ca
                     std_error.decode('ascii').rstrip('\n')
                 )
         download_queue.task_done()
-        if done_cache != None: done_cache.append(cache)
+        if done_cache is not None: done_cache.append(cache)
 
 def invoke_downloaders(args, download_list, name_formatter, done_cache):
     max_downloaders = min(len(download_list), multiprocessing.cpu_count())
@@ -51,13 +51,13 @@ def apply_download_preset(name):
     return []
     
 def find_download_executable(arg):
-    if arg == None:
+    if arg is None:
         ytdlp_path = shutil.which('yt-dlp')
-        if ytdlp_path != None: return ytdlp_path
+        if ytdlp_path is not None: return ytdlp_path
         sys.exit("error: cannot find 'yt-dlp' binary. Please consider downloading it from 'https://github.com/yt-dlp/yt-dlp'")
     else:
         custom_exec_path = shutil.which(arg)
-        if custom_exec_path != None: return custom_exec_path
+        if custom_exec_path is not None: return custom_exec_path
         sys.exit("error: downloader '{}' was not found or is not executable".format(arg))
 
 def extract_download_list(filename):
@@ -82,7 +82,7 @@ def remove_postfix(text, prefix):
     return text
 
 class AuthorTitleFormatter:
-    def __init__(self) -> None:
+    def __init__(self):
         self._delim = '&#&#&' 
         self.extra = ('-o', '%(channel)s{0}%(title)s'.format(self._delim), 
                       '--print', 'after_move:filepath')
@@ -107,7 +107,7 @@ class AuthorTitleFormatter:
             os.remove(path)
 
 def select_name_formatter(preset):
-    if preset == None: return None
+    if preset is None: return None
 
     if preset == 'author-title': return AuthorTitleFormatter()
 
@@ -143,16 +143,16 @@ def str_to_bool(string):
     raise argparse.ArgumentTypeError("'{}' cannot be converted to boolean".format(string))
 
 def install_ytdlp():
-    if shutil.which('yt-dlp') != None:
+    if shutil.which('yt-dlp') is not None:
         print("'yt-dlp' already installed")
         return
 
-    if os.name == 'nt' and shutil.which('winget') != None:
+    if os.name == 'nt' and shutil.which('winget') is not None:
         process = subprocess.Popen('winget install yt-dlp.yt-dlp --source winget'.split(), 
             stdout=sys.stdout, stderr=sys.stderr)
         if process.wait() != 0:
             sys.exit("error: 'yt-dlp' was not installed. code: {}".format(process.returncode))
-        if shutil.which('yt-dlp') == None:
+        if shutil.which('yt-dlp') is None:
             sys.exit("error: cannot find 'yt-dlp' binary")
         return
 
@@ -163,7 +163,7 @@ def install_ytdlp():
             'aria2c': 'sudo aria2c https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp --dir /usr/local/bin -o yt-dlp',
         }
         for cmd, args in utils.items():
-            if shutil.which(cmd) == None: continue
+            if shutil.which(cmd) is None: continue
             dprocess = subprocess.Popen(args.split(), stdout=sys.stdout, stderr=sys.stderr)
             if dprocess.wait() != 0:
                 sys.exit("error: '{}' failed to download. code: {}".format(cmd, dprocess.returncode))
@@ -198,7 +198,7 @@ def main():
     dl_preset_args = apply_download_preset(args.download_preset)
 
     dl_exec = find_download_executable(args.exec)
-    
+
     dl_list = extract_download_list(args.list) if len(urls) == 0 else urls
     done_cache = None
     if args.use_cache:
