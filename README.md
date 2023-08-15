@@ -1,7 +1,7 @@
 
 # parallel-ytdl
 
-Utility for parallel video/audio download
+Utility for parallel video/audio download. Allows to cache downloaded videos so that it is not downloaded several times
 
 ## Options
 
