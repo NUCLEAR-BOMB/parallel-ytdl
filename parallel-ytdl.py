@@ -54,9 +54,7 @@ def find_download_executable(arg):
     if arg == None:
         ytdlp_path = shutil.which('yt-dlp')
         if ytdlp_path != None: return ytdlp_path
-        youtube_dl_path = shutil.which('youtube-dl')
-        if youtube_dl_path != None: return youtube_dl_path
-        sys.exit('error: cannot find downloader binary')
+        sys.exit("error: cannot find 'yt-dlp' binary. Please consider downloading it from 'https://github.com/yt-dlp/yt-dlp'")
     else:
         custom_exec_path = shutil.which(arg)
         if custom_exec_path != None: return custom_exec_path
@@ -144,6 +142,39 @@ def str_to_bool(string):
     elif string in ['false', '0']: return False
     raise argparse.ArgumentTypeError("'{}' cannot be converted to boolean".format(string))
 
+def install_ytdlp():
+    if shutil.which('yt-dlp') != None:
+        print("'yt-dlp' already installed")
+        return
+
+    if os.name == 'nt' and shutil.which('winget') != None:
+        process = subprocess.Popen('winget install yt-dlp.yt-dlp --source winget'.split(), 
+            stdout=sys.stdout, stderr=sys.stderr)
+        if process.wait() != 0:
+            sys.exit("error: 'yt-dlp' was not installed. code: {}".format(process.returncode))
+        if shutil.which('yt-dlp') == None:
+            sys.exit("error: cannot find 'yt-dlp' binary")
+        return
+
+    elif os.name == 'posix' or True:
+        utils = {
+            'curl': 'sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp',
+            'wget': 'sudo wget https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -O /usr/local/bin/yt-dlp',
+            'aria2c': 'sudo aria2c https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp --dir /usr/local/bin -o yt-dlp',
+        }
+        for cmd, args in utils.items():
+            if shutil.which(cmd) == None: continue
+            dprocess = subprocess.Popen(args.split(), stdout=sys.stdout, stderr=sys.stderr)
+            if dprocess.wait() != 0:
+                sys.exit("error: '{}' failed to download. code: {}".format(cmd, dprocess.returncode))
+            eprocess = subprocess.Popen('sudo chmod a+rx /usr/local/bin/yt-dlp'.split(), stdout=sys.stdout, stderr=sys.stderr)
+            if eprocess.wait() != 0:
+                sys.exit("error: failed to make it executable. code: {}".format(eprocess.returncode))
+            return
+
+    print("Unable to install 'yt-dlp' automatically")
+    print("Please consider installing it from 'https://github.com/yt-dlp/yt-dlp'")
+
 def main():
     parser = argparse.ArgumentParser()
 
@@ -153,9 +184,14 @@ def main():
     parser.add_argument('--output-preset', choices=('author-title',))
     parser.add_argument('--cache', metavar='PATH', default='download.cache')
     parser.add_argument('--use-cache', type=str_to_bool, nargs='?', const=True, default=True)
+    parser.add_argument('--install', choices=('yt-dlp',))
     parser.add_argument('downloader_args', nargs='*')
 
     args = parser.parse_args()
+
+    if args.install == 'yt-dlp':
+        install_ytdlp()
+        return
 
     dl_args = args.downloader_args
     dl_args += apply_download_preset(args.download_preset)
