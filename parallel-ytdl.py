@@ -7,9 +7,9 @@ import shutil
 import os
 import multiprocessing
 
-def invoke_single_downloader(args, download_queue, lock, name_formatter):
+def invoke_single_downloader(args, download_queue, lock, name_formatter, done_cache):
     while True:
-        url = download_queue.get()
+        url, cache = download_queue.get()
         full_command = args + [*(name_formatter.extra if name_formatter else ()), url]
         process = subprocess.Popen(full_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         std_output, std_error = process.communicate()
@@ -24,8 +24,9 @@ def invoke_single_downloader(args, download_queue, lock, name_formatter):
                     std_error.decode('ascii').rstrip('\n')
                 )
         download_queue.task_done()
+        done_cache.append(cache)
 
-def invoke_downloaders(args, download_list, name_formatter):
+def invoke_downloaders(args, download_list, name_formatter, done_cache):
     max_downloaders = min(len(download_list), multiprocessing.cpu_count())
 
     download_queue = queue.Queue(max_downloaders)
@@ -33,11 +34,11 @@ def invoke_downloaders(args, download_list, name_formatter):
 
     for _ in range(max_downloaders):
         threading.Thread(target=invoke_single_downloader, args=(
-            args, download_queue, lock, name_formatter
+            args, download_queue, lock, name_formatter, done_cache
         ), daemon=True).start()
     
-    for url in download_list:
-        download_queue.put(url)
+    for url, cache in download_list:
+        download_queue.put((url, cache))
 
     download_queue.join()
 
@@ -59,8 +60,12 @@ def find_download_executable(arg):
         sys.exit("error: downloader '{}' was not found or is not executable".format(arg))
 
 def extract_download_list(filename):
-    with open(filename) as file:
-        download_list = file.readlines()
+    if not os.path.isfile(filename):
+        sys.exit('error: {} is not exists'.format(filename))
+
+    with open(filename, 'r') as cache:
+        download_list = cache.read().splitlines()
+
     if len(download_list) == 0:
         print('warning: {} is empty'.format(filename))
     return download_list
@@ -105,6 +110,33 @@ def select_name_formatter(preset):
 
     if preset == 'author-title': return AuthorTitleFormatter()
 
+URL_HASH_LEN = 11
+def hash_url(url):
+    return url[-11:].encode()
+
+CACHE_TRUNCATE = False
+def cache_diff(urls, path):
+    if not os.path.isfile(path): return [(url, hash_url(url)) for url in urls]
+
+    old_cache = set()
+    with open(path, 'rb') as cache:
+        while True:
+            tmp = cache.read(URL_HASH_LEN)
+            if len(tmp) < URL_HASH_LEN: break
+            old_cache.add(tmp)
+    url_and_hash, done_cache = [], []
+    for url in urls:
+        url_hash = hash_url(url)
+        if url_hash in old_cache:
+            if CACHE_TRUNCATE: done_cache.append(url_hash)
+        else:
+            url_and_hash.append((url, url_hash))
+    return url_and_hash, done_cache
+
+def cache_update(urls_cache, path):
+    with open(path, 'wb+' if CACHE_TRUNCATE else 'ab') as cache:
+        cache.write(b''.join(urls_cache))
+
 def main():
     parser = argparse.ArgumentParser()
 
@@ -120,10 +152,11 @@ def main():
 
     dl_exec = find_download_executable(args.exec)
 
-    dl_list = extract_download_list(args.list)
-
+    cache_path = 'download.cache'
+    dl_list, done_cache = cache_diff(extract_download_list(args.list), path=cache_path)
     name_formatter = select_name_formatter(args.output_preset)
-    invoke_downloaders([dl_exec] + dl_args, dl_list, name_formatter)
+    invoke_downloaders([dl_exec] + dl_args, dl_list, name_formatter, done_cache)
+    cache_update(done_cache, path=cache_path)
 
 if __name__ == '__main__':
     main()
