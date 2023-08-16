@@ -47,9 +47,8 @@ def invoke_downloaders(args, download_list, name_formatter, done_cache):
     download_queue.join()
 
 def apply_download_preset(name):
-    if name == 'audio': 
-        return ['--format', 'ba', '--audio-format', 'mp3', '-x']
-    return []
+    if name is None: return []
+    return ['-f', 'ba', '-x', '--audio-format', name]
     
 def find_download_executable(arg):
     if arg is None:
@@ -152,7 +151,7 @@ def str_to_bool(string):
 def main():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--download-preset', choices=('audio',))
+    parser.add_argument('--download-preset', choices=('mp3', 'opus', 'm4p'))
     parser.add_argument('--exec', metavar='PATH')
     parser.add_argument('--list', type=file_path, metavar='PATH', default='list.txt')
     parser.add_argument('--output-preset', choices=('default', 'author-title',), default='default')
