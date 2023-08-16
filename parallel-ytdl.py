@@ -178,6 +178,7 @@ def main():
         invoke_downloaders([dl_exec] + dl_preset_args + dl_extra_args, dl_list, name_formatter, done_cache)
     else:
         print('info: everything up-to-date')
+        return
         
     if len(dl_list) > len(done_cache):
         print('warning: failed to download {} URLs'.format(len(dl_list) - len(done_cache)))
