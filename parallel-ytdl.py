@@ -59,11 +59,11 @@ def find_download_executable(arg):
         sys.exit("error: downloader '{}' was not found or is not executable".format(arg))
 
 def extract_download_list(filename):
-    if not os.path.isfile(filename):
+    try:
+        with open(filename, 'r') as cache:
+            download_list = cache.read().splitlines()
+    except FileNotFoundError:
         sys.exit('error: {} is not exists'.format(filename))
-
-    with open(filename, 'r') as cache:
-        download_list = cache.read().splitlines()
 
     if len(download_list) == 0:
         print('warning: {} is empty'.format(filename))
