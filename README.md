@@ -12,7 +12,9 @@ Utility for parallel video/audio download. Allows to cache downloaded videos so 
 	- `author-title` Tries to rename the file to the `"author - title.ext"` format
 - `--cache PATH` (**default**: `download.cache`) The path to the file that stores the cache
 - `--use-cache BOOL` (**default**: `true`) Use the cache to store downloaded videos
-- `--cache-mode`
+- `--cache-mode {append,rewrite}` (**default**: `append`)
+	- `--cache-mode append` Add the cache of completed downloads to the end of the last correct cache in the cache file
+	- `--cache-mode rewrite` Completely rewrite the cache using the completed and already cached data
 - `URL ...` List of download urls. The list file will not be used if there is at least one URL
 - `-- EXTRA ... ` Additional parameters for each downloader being launched
 
