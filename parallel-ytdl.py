@@ -9,23 +9,20 @@ import multiprocessing
 from typing import Any
 
 def invoke_single_downloader(args, download_queue, lock, name_formatter, done_cache):
-    while True:
-        if done_cache is not None:
-            url, cache = download_queue.get()
-        else:
-            url = download_queue.get()
+    while not download_queue.empty():
+        url, cache = (*download_queue.get_nowait(), None)[:2]
         full_command = args + [*name_formatter.extra, '--print', 'after_move:filepath', url]
         process = subprocess.Popen(full_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         std_output, std_error = process.communicate()
         encoding = sys.getdefaultencoding()
-        name_formatter(std_output.decode(encoding).rstrip())
-
         if len(std_error) != 0:
             with lock:
                 sys.stderr.write(
                     "Failed with: " + " ".join(full_command) + '\n' +
                     std_error.decode('ascii').rstrip('\n')
                 )
+        name_formatter(std_output.decode(encoding).rstrip())
+
         download_queue.task_done()
         if done_cache is not None: done_cache.append(cache)
 
@@ -36,13 +33,13 @@ def invoke_downloaders(args, download_list, name_formatter, done_cache):
     download_queue = queue.Queue(max_downloaders)
     lock = threading.Lock()
 
+    for url_and_cache in download_list:
+        download_queue.put_nowait(url_and_cache)
+    
     for _ in range(max_downloaders):
         threading.Thread(target=invoke_single_downloader, args=(
             args, download_queue, lock, name_formatter, done_cache
         ), daemon=True).start()
-    
-    for url_and_cache in download_list:
-        download_queue.put(url_and_cache)
 
     download_queue.join()
 
@@ -106,7 +103,7 @@ class AuthorTitleFormatter(DefaultFormatter):
         try:
             os.rename(path, name + fileext)
         except FileExistsError as err:
-            sys.stderr.write("'{}' file exists'\n".format(err.filename2))
+            sys.stderr.write("'{}' file exists\n".format(err.filename2))
             os.remove(path)
 
 def select_name_formatter(preset):
@@ -144,8 +141,8 @@ def cache_update(urls_cache, *, mode, path):
             cache.write(b''.join(urls_cache))
 
 def str_to_bool(string):
-    if string in ['', 'yes' 'true', '1']: return True
-    elif string in ['false', 'no', '0']: return False
+    if string in ['yes', 'true', '1']: return True
+    if string in ['false', 'no', '0']: return False
     raise argparse.ArgumentTypeError("'{}' cannot be converted to boolean".format(string))
 
 def main():
