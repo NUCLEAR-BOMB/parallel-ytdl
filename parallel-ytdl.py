@@ -152,7 +152,7 @@ def main():
 
     parser.add_argument('--download-preset', choices=('mp3', 'opus', 'm4p'))
     parser.add_argument('--exec', metavar='PATH')
-    parser.add_argument('--list', type=file_path, metavar='PATH', default='list.txt')
+    parser.add_argument('--list', type=file_path, metavar='PATH')
     parser.add_argument('--output-preset', choices=('default', 'author-title',), default='default')
     parser.add_argument('--cache', metavar='PATH', default='download.cache')
     parser.add_argument('--use-cache', type=str_to_bool, nargs='?', const=True, default=True)
