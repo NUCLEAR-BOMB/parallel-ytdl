@@ -31,6 +31,7 @@ def invoke_single_downloader(args, download_queue, lock, name_formatter, done_ca
 
 def invoke_downloaders(args, download_list, name_formatter, done_cache):
     max_downloaders = min(len(download_list), multiprocessing.cpu_count())
+    print('info: starting {} downloaders...'.format(max_downloaders))
 
     download_queue = queue.Queue(max_downloaders)
     lock = threading.Lock()
@@ -172,7 +173,11 @@ def main():
         dl_list, done_cache = cache_diff(dl_list, mode=args.cache_mode, path=args.cache)
 
     name_formatter = select_name_formatter(args.output_preset)
-    invoke_downloaders([dl_exec] + dl_preset_args + dl_extra_args, dl_list, name_formatter, done_cache)
+    if len(dl_list) > 0:
+        invoke_downloaders([dl_exec] + dl_preset_args + dl_extra_args, dl_list, name_formatter, done_cache)
+    else:
+        print('info: everything up-to-date')
+        
     if args.use_cache:
         cache_update(done_cache, mode=args.cache_mode, path=args.cache)
 
