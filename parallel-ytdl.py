@@ -142,39 +142,6 @@ def str_to_bool(string):
     elif string in ['false', 'no', '0']: return False
     raise argparse.ArgumentTypeError("'{}' cannot be converted to boolean".format(string))
 
-def install_ytdlp():
-    if shutil.which('yt-dlp') is not None:
-        print("'yt-dlp' already installed")
-        return
-
-    if os.name == 'nt' and shutil.which('winget') is not None:
-        process = subprocess.Popen('winget install yt-dlp.yt-dlp --source winget'.split(), 
-            stdout=sys.stdout, stderr=sys.stderr)
-        if process.wait() != 0:
-            sys.exit("error: 'yt-dlp' was not installed. code: {}".format(process.returncode))
-        if shutil.which('yt-dlp') is None:
-            sys.exit("error: cannot find 'yt-dlp' binary")
-        return
-
-    elif os.name == 'posix' or True:
-        utils = {
-            'curl': 'sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp',
-            'wget': 'sudo wget https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -O /usr/local/bin/yt-dlp',
-            'aria2c': 'sudo aria2c https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp --dir /usr/local/bin -o yt-dlp',
-        }
-        for cmd, args in utils.items():
-            if shutil.which(cmd) is None: continue
-            dprocess = subprocess.Popen(args.split(), stdout=sys.stdout, stderr=sys.stderr)
-            if dprocess.wait() != 0:
-                sys.exit("error: '{}' failed to download. code: {}".format(cmd, dprocess.returncode))
-            eprocess = subprocess.Popen('sudo chmod a+rx /usr/local/bin/yt-dlp'.split(), stdout=sys.stdout, stderr=sys.stderr)
-            if eprocess.wait() != 0:
-                sys.exit("error: failed to make it executable. code: {}".format(eprocess.returncode))
-            return
-
-    print("Unable to install 'yt-dlp' automatically")
-    print("Please consider installing it from 'https://github.com/yt-dlp/yt-dlp'")
-
 def main():
     parser = argparse.ArgumentParser()
 
@@ -184,16 +151,11 @@ def main():
     parser.add_argument('--output-preset', choices=('author-title',))
     parser.add_argument('--cache', metavar='PATH', default='download.cache')
     parser.add_argument('--use-cache', type=str_to_bool, nargs='?', const=True, default=True)
-    parser.add_argument('--install', choices=('yt-dlp',))
 
     args, rest = parser.parse_known_args()
 
     urls = rest[:rest.index('--')] if '--' in rest else rest
     dl_extra_args = rest[rest.index('--') + 1:] if '--' in rest else []
-
-    if args.install == 'yt-dlp':
-        install_ytdlp()
-        return
 
     dl_preset_args = apply_download_preset(args.download_preset)
 
