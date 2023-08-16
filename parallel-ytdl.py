@@ -6,6 +6,7 @@ import argparse
 import shutil
 import os
 import multiprocessing
+from typing import Any
 
 def invoke_single_downloader(args, download_queue, lock, name_formatter, done_cache):
     while True:
@@ -13,12 +14,11 @@ def invoke_single_downloader(args, download_queue, lock, name_formatter, done_ca
             url, cache = download_queue.get()
         else:
             url = download_queue.get()
-        full_command = args + [*(name_formatter.extra if name_formatter else ()), url]
+        full_command = args + [*name_formatter.extra, '--print', 'after_move:filepath', url]
         process = subprocess.Popen(full_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         std_output, std_error = process.communicate()
         encoding = sys.getdefaultencoding()
-        if name_formatter is not None:
-            name_formatter(std_output.decode(encoding).rstrip())
+        name_formatter(std_output.decode(encoding).rstrip())
 
         if len(std_error) != 0:
             with lock:
@@ -82,11 +82,14 @@ def remove_postfix(text, prefix):
         return text[:-len(prefix)]
     return text
 
-class AuthorTitleFormatter:
+class DefaultFormatter:
+    def __init__(self): self.extra = ()
+    def __call__(self, path): ...
+
+class AuthorTitleFormatter(DefaultFormatter):
     def __init__(self):
         self._delim = '&#&#&' 
-        self.extra = ('-o', '%(channel)s{0}%(title)s'.format(self._delim), 
-                      '--print', 'after_move:filepath')
+        self.extra = ('-o', '%(channel)s{0}%(title)s'.format(self._delim))
 
     def _format(self, author, title):
         author = remove_postfix(author, ' - Topic')
@@ -108,8 +111,7 @@ class AuthorTitleFormatter:
             os.remove(path)
 
 def select_name_formatter(preset):
-    if preset is None: return None
-
+    if preset == 'default': return DefaultFormatter()
     if preset == 'author-title': return AuthorTitleFormatter()
 
 URL_HASH_LEN = 11
@@ -153,7 +155,7 @@ def main():
     parser.add_argument('--download-preset', choices=('audio',))
     parser.add_argument('--exec', metavar='PATH')
     parser.add_argument('--list', type=file_path, metavar='PATH', default='list.txt')
-    parser.add_argument('--output-preset', choices=('author-title',))
+    parser.add_argument('--output-preset', choices=('default', 'author-title',), default='default')
     parser.add_argument('--cache', metavar='PATH', default='download.cache')
     parser.add_argument('--use-cache', type=str_to_bool, nargs='?', const=True, default=True)
     parser.add_argument('--cache-mode', choices=('append','rewrite'), default='append')
