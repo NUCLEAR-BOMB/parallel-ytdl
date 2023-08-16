@@ -115,8 +115,7 @@ URL_HASH_LEN = 11
 def hash_url(url):
     return url[-11:].encode()
 
-CACHE_TRUNCATE = False
-def cache_diff(urls, path):
+def cache_diff(urls, *, mode, path):
     old_cache = set()
     if os.path.isfile(path):
         with open(path, 'rb') as cache:
@@ -128,14 +127,19 @@ def cache_diff(urls, path):
     for url in urls:
         url_hash = hash_url(url)
         if url_hash in old_cache:
-            if CACHE_TRUNCATE: done_cache.append(url_hash)
+            if mode == 'rewrite': done_cache.append(url_hash)
         else:
             url_and_hash.append((url, url_hash))
     return url_and_hash, done_cache
 
-def cache_update(urls_cache, path):
-    with open(path, 'wb+' if CACHE_TRUNCATE else 'ab') as cache:
-        cache.write(b''.join(urls_cache))
+def cache_update(urls_cache, *, mode, path):
+    if mode == 'rewrite':
+        with open(path, 'wb+') as cache:
+            cache.write(b''.join(urls_cache))
+    elif mode == 'append':
+        with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT), 'rb+') as cache:
+            cache.seek(-(os.path.getsize(cache.name) % URL_HASH_LEN), os.SEEK_END)
+            cache.write(b''.join(urls_cache))
 
 def str_to_bool(string):
     if string in ['', 'yes' 'true', '1']: return True
@@ -151,6 +155,7 @@ def main():
     parser.add_argument('--output-preset', choices=('author-title',))
     parser.add_argument('--cache', metavar='PATH', default='download.cache')
     parser.add_argument('--use-cache', type=str_to_bool, nargs='?', const=True, default=True)
+    parser.add_argument('--cache-mode', choices=('append','rewrite'), default='append')
 
     args, rest = parser.parse_known_args()
 
@@ -164,12 +169,12 @@ def main():
     dl_list = extract_download_list(args.list) if len(urls) == 0 else urls
     done_cache = None
     if args.use_cache:
-        dl_list, done_cache = cache_diff(dl_list, path=args.cache)
+        dl_list, done_cache = cache_diff(dl_list, mode=args.cache_mode, path=args.cache)
 
     name_formatter = select_name_formatter(args.output_preset)
     invoke_downloaders([dl_exec] + dl_preset_args + dl_extra_args, dl_list, name_formatter, done_cache)
     if args.use_cache:
-        cache_update(done_cache, path=args.cache)
+        cache_update(done_cache, mode=args.cache_mode, path=args.cache)
 
 if __name__ == '__main__':
     main()
