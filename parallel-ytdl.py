@@ -181,6 +181,8 @@ def main():
         
     if len(dl_list) > len(done_cache):
         print('warning: failed to download {} URLs'.format(len(dl_list) - len(done_cache)))
+    else:
+        print('info: download completed successfully')
 
     if args.use_cache:
         cache_update(done_cache, mode=args.cache_mode, path=args.cache)
