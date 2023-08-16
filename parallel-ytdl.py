@@ -16,7 +16,6 @@ def invoke_single_downloader(args, download_queue, lock, name_formatter, done_ca
         full_command = args + [*name_formatter.extra, '--print', 'after_move:filepath', url]
         process = subprocess.Popen(full_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         std_output, std_error = process.communicate()
-        download_queue.task_done()
         encoding = sys.getdefaultencoding()
         if len(std_error) != 0 or process.returncode != 0:
             with lock:
@@ -26,6 +25,7 @@ def invoke_single_downloader(args, download_queue, lock, name_formatter, done_ca
         else:
             name_formatter(std_output[:std_output.index(b'\n')].decode(encoding))
             done_cache.append(cache)
+        download_queue.task_done()
 
 def invoke_downloaders(args, download_list, name_formatter, done_cache):
     max_downloaders = min(len(download_list), multiprocessing.cpu_count())
