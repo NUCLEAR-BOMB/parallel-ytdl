@@ -8,23 +8,24 @@ import os
 import multiprocessing
 from typing import Any
 
+def as_tuple(x): return x if type(x) is tuple else (x,)
+
 def invoke_single_downloader(args, download_queue, lock, name_formatter, done_cache):
     while not download_queue.empty():
-        url, cache = (*download_queue.get_nowait(), None)[:2]
+        url, cache, *_ = *as_tuple(download_queue.get_nowait()), None
         full_command = args + [*name_formatter.extra, '--print', 'after_move:filepath', url]
         process = subprocess.Popen(full_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         std_output, std_error = process.communicate()
-        encoding = sys.getdefaultencoding()
-        if len(std_error) != 0:
-            with lock:
-                sys.stderr.write(
-                    "Failed with: " + " ".join(full_command) + '\n' +
-                    std_error.decode('ascii').rstrip('\n')
-                )
-        name_formatter(std_output.decode(encoding).rstrip())
-
         download_queue.task_done()
-        if done_cache is not None: done_cache.append(cache)
+        encoding = sys.getdefaultencoding()
+        if len(std_error) != 0 or process.returncode != 0:
+            with lock:
+                sys.stderr.write('Failed with: {}\n{}'.format(
+                    ' '.join(full_command), std_error.decode(encoding).rstrip('\n')
+                ))
+        else:
+            name_formatter(std_output[:std_output.index(b'\n')].decode(encoding))
+            done_cache.append(cache)
 
 def invoke_downloaders(args, download_list, name_formatter, done_cache):
     max_downloaders = min(len(download_list), multiprocessing.cpu_count())
@@ -97,13 +98,14 @@ class AuthorTitleFormatter(DefaultFormatter):
         return '{0} - {1}'.format(author, title)
 
     def __call__(self, path):
+        assert len(path) != 0, 'result path is empty'
         filename, fileext = os.path.splitext(os.path.basename(path))
         name = self._format(*filename.split(self._delim))
         
         try:
             os.rename(path, name + fileext)
         except FileExistsError as err:
-            sys.stderr.write("'{}' file exists\n".format(err.filename2))
+            sys.stderr.write("warning: '{}' file exists\n".format(err.filename2))
             os.remove(path)
 
 def select_name_formatter(preset):
@@ -166,9 +168,10 @@ def main():
     dl_exec = find_download_executable(args.exec)
 
     dl_list = extract_download_list(args.list) if len(urls) == 0 else urls
-    done_cache = None
     if args.use_cache:
         dl_list, done_cache = cache_diff(dl_list, mode=args.cache_mode, path=args.cache)
+    else:
+        done_cache = []
 
     name_formatter = select_name_formatter(args.output_preset)
     if len(dl_list) > 0:
@@ -176,6 +179,9 @@ def main():
     else:
         print('info: everything up-to-date')
         
+    if len(dl_list) > len(done_cache):
+        print('warning: failed to download {} URLs'.format(len(dl_list) - len(done_cache)))
+
     if args.use_cache:
         cache_update(done_cache, mode=args.cache_mode, path=args.cache)
 
