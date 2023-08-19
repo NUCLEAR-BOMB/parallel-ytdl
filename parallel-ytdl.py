@@ -150,10 +150,10 @@ def str_to_bool(string):
 def main():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--download-preset', choices=('mp3', 'opus', 'm4p'))
+    parser.add_argument('--download', choices=('mp3', 'opus', 'm4p'))
     parser.add_argument('--exec', metavar='PATH')
     parser.add_argument('--list', type=file_path, metavar='PATH')
-    parser.add_argument('--output-preset', choices=('default', 'author-title',), default='default')
+    parser.add_argument('--output', choices=('default', 'author-title',), default='default')
     parser.add_argument('--cache', metavar='PATH', default='download.cache')
     parser.add_argument('--use-cache', type=str_to_bool, nargs='?', const=True, default=True)
     parser.add_argument('--cache-mode', choices=('append','rewrite'), default='append')
@@ -163,17 +163,17 @@ def main():
     urls = rest[:rest.index('--')] if '--' in rest else rest
     dl_extra_args = rest[rest.index('--') + 1:] if '--' in rest else []
 
-    dl_preset_args = apply_download_preset(args.download_preset)
+    dl_preset_args = apply_download_preset(args.download)
 
     dl_exec = find_download_executable(args.exec)
 
-    dl_list = extract_download_list(args.list) if len(urls) == 0 else urls
+    dl_list = extract_download_list(args.list or 'list.txt') if len(urls) == 0 else urls
     if args.use_cache:
         dl_list, done_cache = cache_diff(dl_list, mode=args.cache_mode, path=args.cache)
     else:
         done_cache = []
 
-    name_formatter = select_name_formatter(args.output_preset)
+    name_formatter = select_name_formatter(args.output)
     if len(dl_list) > 0:
         invoke_downloaders([dl_exec] + dl_preset_args + dl_extra_args, dl_list, name_formatter, done_cache)
     else:
